@@ -3,24 +3,28 @@
 
 Texture2D<int> input;
 RWTexture2D<float4> output;
-int viewMode;
+int2 dims;
+int2 viewMode;
 float4 ruleColors[8];
 
 [numthreads(8,8,1)]
 void Viewport (uint3 id : SV_DispatchThreadID)
 {
-    int pixIn = input[id.xy];
-    int value = 0;
+    uint pixIn = (uint)input[id.xy];
+    int colorIndex = (pixIn & 0xf00) >> 8;
+    int state = (pixIn & 0x1);
     float4 pixOut = float4(0, 0, 0, 0);
-    switch(viewMode){
-        case 0:     value = pixIn & 0x000000ff;
-                    pixOut = value == 0 ? float4(0, 0, 0, 1) : float4(1, 1, 1, 1);
-                    break;
-        case 1:     value = pixIn & 0x0000ff00;
-                    pixOut = ruleColors[value];
-                    break;
-        default:    pixOut = float4(-1, -1, -1, -1);
-                    break;
+    if(viewMode[0] == 0){
+        if(state == 0){
+            pixOut = float4(0, 0, 0, 1);
+        }
+        else {
+            pixOut = float4(1, 1, 1, 1);
+        }
     }
-    output[id.xy] = pixOut;
+    else {
+        pixOut = float4(ruleColors[colorIndex].r, ruleColors[colorIndex].g, ruleColors[colorIndex].b, ruleColors[colorIndex].a);
+    }
+    int2 outputCoords = viewMode[1] == 0 ? int2(id.x, id.y) : int2(id.x, dims.y - id.y - 1);
+    output[outputCoords.xy] = pixOut;
 }

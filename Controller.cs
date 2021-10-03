@@ -12,21 +12,33 @@ public class Controller : MonoBehaviour
     public byte rule = 30;
     public int boardToView = 0;
     public int viewMode = 0;
+    public int flipTimeDim = 1;
 
     private int kernelID;
+    private int lastboardViewed = -1;
     private List<byte[]> initData;
     private Dispatcher dispatcher;
     private SimulationData data;
     private System.Threading.Thread dispatcherThread;
-    private int lastboardViewed = -1;
     private Texture2D dataBuffer;
     private RenderTexture canvas;
 
+    private float[] ruleColors = new float[8 * 4]{
+        0.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 0.0f, 0.0f, 1.0f,
+        1.0f, 1.0f, 0.0f, 1.0f,
+        0.0f, 1.0f, 0.0f, 1.0f,
+        0.0f, 1.0f, 1.0f, 1.0f,
+        0.0f, 0.0f, 1.0f, 1.0f,
+        1.0f, 0.0f, 1.0f, 1.0f,
+        1.0f, 1.0f, 1.0f, 1.0f,
+    };
+
     void Start()
     {
-        this.initData = GenerateRandom(width, 65536);
-        print(this.initData.Count);
-        print(this.initData[0].Length);
+        //this.initData = GenerateRandom(width, 16);
+        this.initData = new List<byte[]>();
+        this.initData.Add(new byte[2]{0x00, 0x80});
         this.dispatcher = new Dispatcher(initData, width, generations, rule);
         this.data = this.dispatcher.data;
         this.dispatcherThread = new System.Threading.Thread(this.dispatcher.RunDispatcher);
@@ -38,19 +50,27 @@ public class Controller : MonoBehaviour
         this.canvas.filterMode = FilterMode.Point;
         this.kernelID = this.viewportShader.FindKernel("Viewport");
         this.viewportShader.SetFloats("ruleColors", ruleColors);
+        this.viewportShader.SetInts("dims", new int[2]{width, generations});
         this.viewportShader.SetTexture(kernelID, "input", this.dataBuffer);
         this.viewportShader.SetTexture(kernelID, "output", this.canvas);
     }
 
     void OnRenderImage(RenderTexture src, RenderTexture dest){
+        bool dispatchShader = true;
         if(lastboardViewed != boardToView){
-            if(this.data.boards[boardToView].IsSimulated()){
+            if(this.data.boards[boardToView].isSimulated){
                 this.dataBuffer.SetPixelData<byte>(this.data.boards[boardToView].ToByteStream(sizeof(int)), 0, 0);
                 this.dataBuffer.Apply();
-                this.viewportShader.SetInt("viewMode", viewMode);
-                this.viewportShader.Dispatch(kernelID, width / SHADERTHREADGROUPS, generations / SHADERTHREADGROUPS, 1);
                 lastboardViewed = boardToView;
             }
+            else {
+                dispatchShader = false;
+                Debug.Log("Requested board does not exist or has not yet been simulated!");
+            }
+        }
+        if(dispatchShader){
+            this.viewportShader.SetInts("viewMode", new int[2]{viewMode, flipTimeDim});
+            this.viewportShader.Dispatch(kernelID, width / SHADERTHREADGROUPS, generations / SHADERTHREADGROUPS, 1);
         }
         Graphics.Blit(this.canvas, dest);
     }
@@ -66,15 +86,4 @@ public class Controller : MonoBehaviour
         }
         return output;
     }
-
-    public static readonly float[] ruleColors = new float[8 * 4]{
-        0, 0, 0, 1,
-        1, 0, 0, 1,
-        1, 1, 0, 1,
-        0, 1, 0, 1,
-        0, 1, 1, 1,
-        0, 0, 1, 1,
-        1, 0, 1, 1,
-        1, 1, 1, 1,
-    };
 }

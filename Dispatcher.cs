@@ -27,12 +27,12 @@ public class Board
     };
 
     public List<Cell[]> board;
-    private bool simulated; 
+    public bool isSimulated; 
     private int width;
     private int generations;
 
     public Board(byte[] initData, int width, int generations){
-        this.simulated = false;
+        this.isSimulated = false;
         this.width = width;
         this.generations = generations;
         this.board = new List<Cell[]>(generations);
@@ -44,10 +44,6 @@ public class Board
                 this.board[0][index + j].rule = this.board[0][index + j].state == 0 ? (byte)0 : (byte)7;
             }
         }
-    }
-
-    public bool IsSimulated(){
-        return this.simulated;
     }
 
     public void Simulate(byte rule){
@@ -62,7 +58,7 @@ public class Board
                 row[j].rule = (byte)ruleVec; 
             }
         }
-        this.simulated = true;
+        this.isSimulated = true;
     }
 
     public byte[] ToByteStream(){
@@ -117,7 +113,7 @@ public class Board
         }
         return output;
     }
-    public byte[] ToByteStream(DataRequestType dataType, int elementSize){
+    public byte[] ToByteStream(int elementSize, DataRequestType dataType){
         if(elementSize <= 0){ return new byte[1]; }
         byte[] output = new byte[this.width * this.generations * elementSize];
         int index = 0;
@@ -166,7 +162,6 @@ public class Dispatcher
 {
     private static readonly int NUMTHREADS = 8;
     public SimulationData data;
-
     private List<Thread> threads;
 
     public Dispatcher(List<byte[]> initData, int width, int generations, byte rule){
@@ -177,6 +172,7 @@ public class Dispatcher
             this.threads.Add(new Thread(this.RunComputeThread));
         }
     }
+
     public void RunDispatcher(object callingDispatcher){
         System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
         timer.Start();
@@ -198,7 +194,6 @@ public class Dispatcher
         SimulationData data = td.parent.data;
         int index = td.threadID;
         do{
-            //Debug.Log("Thread " + td.threadID.ToString() + " attempts to calculate index " + index.ToString());
             Board currentBoard;
             byte rule;
             lock(data){
