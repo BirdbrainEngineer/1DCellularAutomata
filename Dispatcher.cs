@@ -34,9 +34,10 @@ public class Board
         this.generations = generations;
         this.board = new List<Cell[]>(generations);
         this.board.Add(new Cell[width]);
-        for(int i = 0; i < initData.Length; i++){
+        for(int i = 0; i < (int)(Mathf.Ceil(width / 8)); i++){
             var index = i * 8;
             for(int j = 0; j < 8; j++){
+                if(index + j == width){ break; }
                 this.board[0][index + j].state = ((initData[i] << j) & 0x80) == 0 ? (byte)0 : (byte)1;
                 this.board[0][index + j].rule = this.board[0][index + j].state == 0 ? (byte)0 : (byte)7;
             }

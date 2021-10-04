@@ -8,20 +8,24 @@ public class Controller : MonoBehaviour
     private static readonly int SHADERTHREADGROUPS = 8;
 
     public ComputeShader viewportShader;
-    public (int board, int sim) boardSimToView = (0, 0);
+    public int boardToView = 0;
+    public int simulationToView = 0;
     public int flipTimeDim = 1;
     public string viewMode = "Vanilla";
     public int width = 32;
     public int generations = 32;
     public byte[] rules = {30};
+    public List<byte[]> initData;
 
+    private (int board, int sim) boardSimToView = (0, 0);
     private (int board, int sim) lastBoardSimViewed = (-1, -1);
-    private List<byte[]> initData;
     private List<SimulationData> data;
     private Thread simulationThread;
     private RenderTexture canvas;
     private ComputeBuffer dataBuffer;
     private ComputeBuffer colorBuffer;
+    private string shaderToUse;
+    private int timeDimDirection;
 
     private Dictionary<string,int> kernelIDs;
 
@@ -38,23 +42,56 @@ public class Controller : MonoBehaviour
 
     void Start()
     {
-        this.data = new List<SimulationData>();
         this.kernelIDs = new Dictionary<string, int>(){
             {"Vanilla", this.viewportShader.FindKernel("Vanilla")},
             {"Rule", this.viewportShader.FindKernel("Rule")},
             {"Test", this.viewportShader.FindKernel("Test")},
         };
         this.initData = new List<byte[]>();
-        this.initData.Add(new byte[4]{0x00, 0x00, 0x80, 0x00});
+        this.initData.Add(new byte[4]{0x00, 0x80, 0x80, 0x00});
+        this.colorBuffer = new ComputeBuffer(8, 4 * sizeof(float));
+        this.RunSimulation();
+        this.simulationThread.Join();
+    }
+
+    void Update(){
+        if(Input.GetKeyDown(KeyCode.V)){
+            this.ReSetViewportParameters();
+        }
+        if(Input.GetKeyDown(KeyCode.R)){
+            if(this.simulationThread.IsAlive){
+                this.simulationThread.Abort();
+                this.simulationThread.Join();
+            }
+            this.RunSimulation();
+            this.lastBoardSimViewed = (-1, -1);
+        }
+        if(Input.GetKeyDown(KeyCode.U)){
+            //user code stuff todo
+        }
+    }
+
+    void ReSetViewportParameters(){
+        this.shaderToUse = viewMode;
+        this.timeDimDirection = flipTimeDim;
+        this.boardSimToView.board = boardToView;
+        this.boardSimToView.sim = simulationToView;
+        this.colorBuffer.SetData(ruleColors);
+    }
+
+    void RunSimulation(){
+        boardToView = 0;
+        simulationToView = 0;
+        this.data = new List<SimulationData>();
         this.simulationThread = new Thread(this.RunSimulationThread);
         this.simulationThread.Start();
+        if(this.dataBuffer != null){ this.dataBuffer.Release(); }
+        if(this.canvas != null){ this.canvas.Release(); }
         this.dataBuffer = new ComputeBuffer(width * generations, sizeof(int));
         this.canvas = new RenderTexture(width, generations, 24);
         this.canvas.enableRandomWrite = true;
         this.canvas.filterMode = FilterMode.Point;
-        this.colorBuffer = new ComputeBuffer(8, 16);
-        this.colorBuffer.SetData(ruleColors);
-        this.simulationThread.Join();
+        this.ReSetViewportParameters();
     }
 
     public void RunSimulationThread(){
@@ -89,14 +126,16 @@ public class Controller : MonoBehaviour
             }
         }
         if(dispatchShader){
+            (int w, int h) dims;
             lock(this.data[boardSimToView.sim]){
-                this.viewportShader.SetInts("dims", new int[2]{this.data[boardSimToView.sim].width, this.data[boardSimToView.sim].generations});
+                dims = (this.data[boardSimToView.sim].width, this.data[boardSimToView.sim].generations);
             }
-            this.viewportShader.SetInt("flipVertical", flipTimeDim);
-            this.viewportShader.SetBuffer(this.kernelIDs[viewMode], "ruleColors", this.colorBuffer);
-            this.viewportShader.SetBuffer(this.kernelIDs[viewMode], "input", this.dataBuffer);
-            this.viewportShader.SetTexture(this.kernelIDs[viewMode], "output", this.canvas);
-            this.viewportShader.Dispatch(this.kernelIDs[viewMode], width / SHADERTHREADGROUPS, generations / SHADERTHREADGROUPS, 1);
+            this.viewportShader.SetInt("flipVertical", this.timeDimDirection);
+            this.viewportShader.SetInts("dims", new int[2]{dims.w, dims.h});
+            this.viewportShader.SetBuffer(this.kernelIDs[this.shaderToUse], "ruleColors", this.colorBuffer);
+            this.viewportShader.SetBuffer(this.kernelIDs[this.shaderToUse], "input", this.dataBuffer);
+            this.viewportShader.SetTexture(this.kernelIDs[this.shaderToUse], "output", this.canvas);
+            this.viewportShader.Dispatch(this.kernelIDs[this.shaderToUse], dims.w / SHADERTHREADGROUPS, dims.h / SHADERTHREADGROUPS, 1);
         }
         Graphics.Blit(this.canvas, dest);
     }
@@ -116,5 +155,30 @@ public class Controller : MonoBehaviour
             }
         }
         return output;
+    }
+
+    private List<byte[]> GenerateCount(int width, byte bits){
+        var shiftAmount = bits > 30 ? 30 : bits;
+        int configurations = 0x1 << shiftAmount;
+        List<byte[]> output = new List<byte[]>(configurations);
+        var bytesPerBoard = (int)Mathf.Ceil(width / 8);
+        for(int i = 0; i < configurations; i++){
+            var bitstring = new byte[4]{(byte)(i & 0xff), (byte)(i & 0xff00 >> 8), (byte)(i & 0xff0000 >> 16), (byte)(i & 0xff000000 >> 24)};
+            for(int j = 0; j < bytesPerBoard; j++){
+                if(j < 4){ output[i][j] = bitstring[j]; }
+                else { output[i][j] = 0; }
+            }
+        }
+        return output;
+    }
+
+    private byte[] SetRuleRange(byte from, byte to){
+        int finish = to > from ? to : from;
+        int start = from < to ? from : to;
+        byte[] result = new byte[finish - start];
+        for(int i = start; i <= finish; i++){
+            result[i] = (byte)i;
+        }
+        return result;
     }
 }
