@@ -22,8 +22,7 @@ public class ThreadData
 public class Board
 {
     public enum DataRequestType{
-        State = 0,
-        Rule = 1,
+        State, Rule,
     };
 
     public List<Cell[]> board;
@@ -160,29 +159,37 @@ public class SimulationData
 
 public class Dispatcher
 {
+    public enum SimulationState{
+        Uninitialized, Initialized, Running, Finished,
+    };
+
     private static readonly int NUMTHREADS = 8;
     public SimulationData data;
+    public SimulationState status = SimulationState.Uninitialized;
     private List<Thread> threads;
 
     public Dispatcher(List<byte[]> initData, int width, int generations, byte rule){
-        data = new SimulationData(initData, width, generations, rule);
+        this.data = new SimulationData(initData, width, generations, rule);
         var threadsToDeploy = initData.Count >= NUMTHREADS ? NUMTHREADS : initData.Count;
         this.threads = new List<Thread>(threadsToDeploy);
         for(int i = 0; i < threadsToDeploy; i++){
             this.threads.Add(new Thread(this.RunComputeThread));
         }
+        this.status = SimulationState.Initialized;
     }
 
     public void RunDispatcher(object callingDispatcher){
         System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
         timer.Start();
         Dispatcher caller = (Dispatcher)callingDispatcher;
+        lock(caller){ caller.status = SimulationState.Running; }
         for(int i = 0; i < this.threads.Count; i++){
             this.threads[i].Start(new ThreadData(caller, i));
         }
         foreach(var thread in caller.threads){
             thread.Join();
         }
+        lock(caller){ caller.status = SimulationState.Finished; }
         timer.Stop();
         Debug.Log("Simulation done in " + timer.ElapsedMilliseconds.ToString() + " milliseconds.");
     }
