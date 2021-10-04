@@ -1,24 +1,24 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System.Threading;
 
 public class Controller : MonoBehaviour
 {
     private static readonly int SHADERTHREADGROUPS = 8;
 
     public ComputeShader viewportShader;
-    public int width = 32;
-    public int generations = 32;
-    public byte rule = 30;
     public (int board, int sim) boardSimToView = (0, 0);
     public int flipTimeDim = 1;
     public string viewMode = "Vanilla";
+    public int width = 32;
+    public int generations = 32;
+    public byte[] rules = {30};
 
     private (int board, int sim) lastBoardSimViewed = (-1, -1);
     private List<byte[]> initData;
-    private Dispatcher dispatcher;
     private List<SimulationData> data;
-    private System.Threading.Thread dispatcherThread;
+    private Thread simulationThread;
     private RenderTexture canvas;
     private ComputeBuffer dataBuffer;
     private ComputeBuffer colorBuffer;
@@ -44,43 +44,54 @@ public class Controller : MonoBehaviour
             {"Rule", this.viewportShader.FindKernel("Rule")},
             {"Test", this.viewportShader.FindKernel("Test")},
         };
-        //this.initData = GenerateRandom(width, 16);
         this.initData = new List<byte[]>();
-        this.initData.Add(new byte[2]{0x00, 0x80});
-        this.dispatcher = new Dispatcher(initData, width, generations, rule);
-        this.data.Add(this.dispatcher.data);
-        this.dispatcherThread = new System.Threading.Thread(this.dispatcher.RunDispatcher);
-        this.dispatcherThread.Start(this.dispatcher);
+        this.initData.Add(new byte[4]{0x00, 0x00, 0x80, 0x00});
+        this.simulationThread = new Thread(this.RunSimulationThread);
+        this.simulationThread.Start();
         this.dataBuffer = new ComputeBuffer(width * generations, sizeof(int));
         this.canvas = new RenderTexture(width, generations, 24);
         this.canvas.enableRandomWrite = true;
         this.canvas.filterMode = FilterMode.Point;
         this.colorBuffer = new ComputeBuffer(8, 16);
         this.colorBuffer.SetData(ruleColors);
+        this.simulationThread.Join();
+    }
+
+    public void RunSimulationThread(){
+        System.Diagnostics.Stopwatch timer = new System.Diagnostics.Stopwatch();
+        timer.Start();
+        Dispatcher dispatcher;
+        Thread dispatcherThread;
+        for(int i = 0; i < this.rules.Length; i++){
+            dispatcher = new Dispatcher(initData, width, generations, rules[i]);
+            this.data.Add(dispatcher.data);
+            dispatcherThread = new Thread(dispatcher.RunDispatcher);
+            dispatcherThread.Start(dispatcher);
+            dispatcherThread.Join();
+        }
+        timer.Stop();
+        Debug.Log("All rules simulated in " + timer.Elapsed.ToString() + " seconds.");
     }
 
     void OnRenderImage(RenderTexture src, RenderTexture dest){
         bool dispatchShader = true;
         if(this.lastBoardSimViewed != boardSimToView){
             try{
-                if(this.data[boardSimToView.sim].boards[boardSimToView.board].isSimulated){
+                lock(this.data[boardSimToView.sim].boards[boardSimToView.board]){
                     this.dataBuffer.SetData(this.data[boardSimToView.sim].boards[boardSimToView.board].ToByteStream(sizeof(int)));
-                    lastBoardSimViewed = boardSimToView;
                 }
-                else {
-                    dispatchShader = false;
-                    boardSimToView = this.lastBoardSimViewed;
-                    Debug.Log("Requested board is not yet simulated!");
-                }
+                lastBoardSimViewed = boardSimToView;
             }
             catch(System.IndexOutOfRangeException){
                 dispatchShader = false;
                 boardSimToView = this.lastBoardSimViewed;
-                Debug.Log("Requested board does not exist!");
+                Debug.Log("Requested board does not exist! Maybe not simulated yet or wrong index?");
             }
         }
         if(dispatchShader){
-            this.viewportShader.SetInts("dims", new int[2]{this.data[boardSimToView.sim].width, this.data[boardSimToView.sim].generations});
+            lock(this.data[boardSimToView.sim]){
+                this.viewportShader.SetInts("dims", new int[2]{this.data[boardSimToView.sim].width, this.data[boardSimToView.sim].generations});
+            }
             this.viewportShader.SetInt("flipVertical", flipTimeDim);
             this.viewportShader.SetBuffer(this.kernelIDs[viewMode], "ruleColors", this.colorBuffer);
             this.viewportShader.SetBuffer(this.kernelIDs[viewMode], "input", this.dataBuffer);
