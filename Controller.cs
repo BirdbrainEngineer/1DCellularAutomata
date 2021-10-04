@@ -68,6 +68,8 @@ public class Controller : MonoBehaviour
         }
         if(Input.GetKeyDown(KeyCode.U)){
             //user code stuff todo
+            this.initData = GenerateCount(width, 16);
+            foreach(var t in this.initData[3]){Debug.Log(t.ToString());}
         }
     }
 
@@ -163,19 +165,24 @@ public class Controller : MonoBehaviour
         List<byte[]> output = new List<byte[]>(configurations);
         var bytesPerBoard = (int)Mathf.Ceil(width / 8);
         for(int i = 0; i < configurations; i++){
-            var bitstring = new byte[4]{(byte)(i & 0xff), (byte)(i & 0xff00 >> 8), (byte)(i & 0xff0000 >> 16), (byte)(i & 0xff000000 >> 24)};
+            var configuration = new byte[bytesPerBoard];
             for(int j = 0; j < bytesPerBoard; j++){
-                if(j < 4){ output[i][j] = bitstring[j]; }
-                else { output[i][j] = 0; }
+                if(j < 4){
+                    configuration[j] = (byte)(i >> (j * 8));
+                }
+                else {
+                    configuration[j] = 0x00;
+                }
             }
+            output.Add(configuration);
         }
         return output;
     }
 
     private byte[] SetRuleRange(byte from, byte to){
-        int finish = to > from ? to : from;
         int start = from < to ? from : to;
-        byte[] result = new byte[finish - start];
+        int finish = to > from ? to : from;
+        byte[] result = new byte[(finish - start) + 1];
         for(int i = start; i <= finish; i++){
             result[i] = (byte)i;
         }
