@@ -1,0 +1,19 @@
+
+#pragma kernel QueryViewer
+
+RWStructuredBuffer<int> input;
+RWTexture2D<float4> output;
+int2 MaxMin;
+int2 dims;
+int flipVertical;
+
+[numthreads(8,8,1)]
+void QueryViewer (uint3 id : SV_DispatchThreadID)
+{
+    int pixIn = input[id.x + (id.y * dims.y)];
+    float colorStep = 1.0 / (MaxMin[0] - MaxMin[1]);
+    float colorChannel = colorStep * (pixIn - MaxMin[1]);
+    float4 pixOut = float4(colorChannel, colorChannel, colorChannel, 1);
+    int2 outputCoords = int2(id.x, (flipVertical == 0 ? id.y : dims.y - id.y - 1));
+    output[outputCoords.xy] = pixOut;
+}

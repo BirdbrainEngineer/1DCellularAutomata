@@ -1,5 +1,4 @@
 
-#pragma kernel Test
 #pragma kernel Vanilla
 #pragma kernel Rule
 
@@ -8,17 +7,6 @@ RWTexture2D<float4> output;
 RWStructuredBuffer<float4> ruleColors;
 int2 dims;
 int flipVertical;
-
-[numthreads(8,8,1)]
-void Test (uint3 id : SV_DispatchThreadID)
-{
-    int pixIn = input[id.x + (id.y * dims.y)];
-    float4 pixOut = float4(0, 0, 0, 0);
-    float num = (float)(pixIn - 0xff) + 64.0;
-    pixOut = num == 0 ? float4(0, 0, 0, 1) : float4((float)1/num, (float)1/num, (float)1/num, 1);
-    int2 outputCoords = flipVertical == 0 ? int2(id.x, id.y) : int2(id.x, dims.y - id.y - 1);
-    output[outputCoords.xy] = pixOut;
-}
 
 [numthreads(8,8,1)]
 void Vanilla (uint3 id : SV_DispatchThreadID)
