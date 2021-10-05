@@ -10,10 +10,6 @@ public struct Cell{
 
 public class Board
 {
-    public enum DataRequestType{
-        State, Rule,
-    };
-
     public List<Cell[]> board;
     private int width;
     private int generations;
@@ -58,32 +54,6 @@ public class Board
                 output[index] = cell.rule;
                 index++;
                 for(int i = 2; i < elementSize; i++){
-                    output[index] = 0;
-                    index++;
-                }
-            }
-        }
-        return output;
-    }
-    public byte[] ToByteStream(int elementSize, DataRequestType dataType){
-        if(elementSize <= 0){ return new byte[1]; }
-        byte[] output = new byte[this.width * this.generations * elementSize];
-        int index = 0;
-        foreach(var row in this.board){
-            foreach(var cell in row){
-                switch(dataType){
-                    case DataRequestType.State:    
-                        output[index] = cell.state;
-                        break;
-                    case DataRequestType.Rule:
-                        output[index] = cell.rule;
-                        break;
-                    default:
-                        output[index] = 0;
-                        break;
-                }
-                index++;
-                for(int i = 1; i < elementSize; i++){
                     output[index] = 0;
                     index++;
                 }

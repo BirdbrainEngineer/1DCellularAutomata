@@ -11,6 +11,14 @@ public class SimulationData
     public readonly int generations;
     public readonly byte rule;
 
+    public SimulationData(){
+        this.initData = new List<byte[]>(){new byte[1]{0x00}};
+        this.boards = new Board[1]{new Board(this.initData[0], 1, 1)};
+        this.width = 1;
+        this.generations = 1;
+        this.rule = 0x00;
+    }
+
     public SimulationData(List<byte[]> initData, int width, int generations, byte rule){
         this.width = width;
         this.generations = generations;
@@ -31,7 +39,7 @@ public class Dispatcher
             this.threadID = id;
         }
     }
-    
+
     private static readonly int NUMTHREADS = 8;
     public SimulationData data;
     private List<Thread> threads;
