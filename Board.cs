@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public struct Cell{
-    public static readonly int Size = 2;
     public byte state;
     public byte rule;
 }

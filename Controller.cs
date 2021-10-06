@@ -15,6 +15,9 @@ public class Controller : MonoBehaviour
     public string viewMode = "Vanilla";
     public QueryEngine.QueryType queryType = QueryEngine.QueryType.State;
     public bool viewQueries = false;
+    public string saveLocation = "";
+    public string saveFileName = "query output";
+    public bool saveAsText = true;
     public int width = 32;
     public int generations = 32;
     public byte[] rules = {30};
@@ -61,7 +64,10 @@ public class Controller : MonoBehaviour
         this.simulationThread.Join();
         this.queryEngine.RunQuery();
     }
-
+    //V for updating viewport
+    //U for executing user written code for initialization
+    //Q for initiating a query
+    //S for saving the result of the last query
     void Update(){
         if(this.queryEngine.GetStatus(true) == QueryEngine.QueryStatus.Finished){
             this.queries.Add(this.queryEngine.result);
@@ -80,7 +86,7 @@ public class Controller : MonoBehaviour
         if(Input.GetKeyDown(KeyCode.U)){
             try{
                 //user code stuff todo
-                this.rules = SetRuleRange(0, 127);
+                this.rules = SetRuleRange(64, 127);
                 this.initData = GenerateCount(width, 16);
                 //this.initData = GenerateRandom(16, 2048);
             }
@@ -98,6 +104,10 @@ public class Controller : MonoBehaviour
                 this.queryThread = new Thread(this.queryEngine.RunQuery);
                 this.queryThread.Start();
             }
+        }
+        if(Input.GetKeyDown(KeyCode.S)){
+            var boardToExport = this.queries[boardSimToView.sim][boardSimToView.board];
+            QueryEngine.QueryBoard.SaveAsText(boardToExport, saveLocation, saveFileName);
         }
     }
 
@@ -257,9 +267,10 @@ public class Controller : MonoBehaviour
     private byte[] SetRuleRange(byte from, byte to){
         int start = from < to ? from : to;
         int finish = to > from ? to : from;
-        byte[] result = new byte[(finish - start) + 1];
-        for(int i = start; i <= finish; i++){
-            result[i] = (byte)i;
+        var len = finish - start + 1;
+        byte[] result = new byte[len];
+        for(int i = 0; i < len; i++){
+            result[i] = (byte)(i + start);
         }
         return result;
     }
