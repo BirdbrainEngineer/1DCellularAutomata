@@ -1,3 +1,6 @@
+//Attach this script to Main Camera
+//Add Viewport.compute and QueryViewer.compute to viewportShader and queryShader respectively in the editor.
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -56,7 +59,8 @@ public class Controller : MonoBehaviour
             {"Rule", this.viewportShader.FindKernel("Rule")},
         };
         this.initData = new List<byte[]>();
-        this.initData.Add(new byte[4]{0x00, 0x80, 0x80, 0x00});
+        //this.initData = GenerateRandom(512, 1);
+        this.initData.Add(new byte[8]{0x71, 0x5f, 0x37, 0x52, 0x0a, 0x82, 0x2c, 0xf1});
         this.colorBuffer = new ComputeBuffer(8, 4 * sizeof(float));
         this.RunSimulation();
         this.queries = new List<List<QueryEngine.QueryBoard>>();
@@ -86,9 +90,9 @@ public class Controller : MonoBehaviour
         if(Input.GetKeyDown(KeyCode.U)){
             try{
                 //user code stuff todo
-                this.rules = SetRuleRange(64, 127);
+                //this.rules = SetRuleRange(64, 127);
                 this.initData = GenerateCount(width, 16);
-                //this.initData = GenerateRandom(16, 2048);
+                //this.initData = GenerateRandom(64, 256);
             }
             catch {
                 Debug.Log("Entered script not valid!");
